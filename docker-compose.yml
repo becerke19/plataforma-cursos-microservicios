@@ -1,0 +1,202 @@
+services:
+  traefik:
+    image: traefik:v3.2
+    container_name: cursos-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - cursos-net
+
+  # --- Bases de datos PostgreSQL (una por microservicio) ---
+  db-auth:
+    image: postgres:16-alpine
+    container_name: db-auth
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-auth-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  db-courses:
+    image: postgres:16-alpine
+    container_name: db-courses
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: courses_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-courses-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d courses_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  db-progress:
+    image: postgres:16-alpine
+    container_name: db-progress
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: progress_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg-progress-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d progress_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  db-assessments:
+    image: postgres:16-alpine
+    container_name: db-assessments
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: assessments_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg-assessments-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d assessments_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  db-certificates:
+    image: postgres:16-alpine
+    container_name: db-certificates
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: certificates_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg-certificates-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d certificates_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  db-payments:
+    image: postgres:16-alpine
+    container_name: db-payments
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: payments_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - pg-payments-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d payments_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  # --- Sesiones / Refresh Tokens ---
+  redis:
+    image: redis:7-alpine
+    container_name: cursos-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  # --- Broker de eventos ---
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: cursos-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+  # --- Almacenamiento S3 local (videos y PDFs) ---
+  s3-storage:
+    image: localstack/localstack:3.8
+    container_name: cursos-s3
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - s3-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cursos-net
+
+volumes:
+  pg-auth-data:
+  pg-courses-data:
+  pg-progress-data:
+  pg-assessments-data:
+  pg-certificates-data:
+  pg-payments-data:
+  redis-data:
+  rabbitmq-data:
+  s3-data:
+
+networks:
+  cursos-net:
+    driver: bridge
