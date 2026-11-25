@@ -17,7 +17,9 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3003);
 
+  app.enableCors();
   await app.listen(port);
   console.log('progress-service corriendo en http://localhost:' + port);
 }
 bootstrap();
+

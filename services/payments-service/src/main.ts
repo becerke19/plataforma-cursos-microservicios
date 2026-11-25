@@ -17,7 +17,9 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3005);
 
+  app.enableCors();
   await app.listen(port);
   console.log('payments-service corriendo en http://localhost:' + port);
 }
 bootstrap();
+
